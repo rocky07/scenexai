@@ -1,0 +1,18 @@
+# Installed as /etc/systemd/system/scenex-api.service on the EC2 instance.
+[Unit]
+Description=Scenex AI API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rakesh
+WorkingDirectory=/home/rakesh/scenex-ai/server
+EnvironmentFile=/home/rakesh/scenex-ai/server/.env
+# Find the path with `which node` on the instance and change this line if it differs.
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
