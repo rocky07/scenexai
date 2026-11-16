@@ -184,4 +184,3 @@ app.post('/api/chats/:id/messages', requireAuth, async (req, res) => {
 
 seedFirstUser();
 app.listen(PORT, () => console.log(`Scenex AI API on http://localhost:${PORT}`));
-
