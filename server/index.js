@@ -3,12 +3,15 @@ import express from 'express';
 import { db, save } from './store.js';
 import { hashPassword, verifyPassword, createSession, deleteSession, requireAuth, publicUser } from './auth.js';
 import { providerStatus, complete } from './ai.js';
+import { mountPlugins } from './plugin-routes.js';
+import { tasksFor, updateTask, briefingsFor, runTask, search, startScheduler } from './workspace.js';
 
 const PORT = process.env.PORT || 4000;
 // Comma-separated list of front-end origins allowed to call the API, e.g. https://main.d1234.amplifyapp.com
 const CORS_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map((o) => o.trim());
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+// Keep the raw body too: Facebook webhook signatures are computed over the exact bytes.
+app.use(express.json({ limit: '1mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -180,7 +183,39 @@ app.post('/api/chats/:id/messages', requireAuth, async (req, res) => {
   }
 });
 
+// ---- Scheduled briefings and search ----------------------------------------
+
+app.get('/api/scheduled', requireAuth, (req, res) => {
+  res.json({ tasks: tasksFor(req.company.id), briefings: briefingsFor(req.company.id) });
+});
+
+app.put('/api/scheduled/:id', requireAuth, (req, res) => {
+  const task = updateTask(req.company.id, req.params.id, req.body || {});
+  if (!task) return res.status(404).json({ error: 'Task not found.' });
+  res.json({ task });
+});
+
+app.post('/api/scheduled/:id/run', requireAuth, async (req, res) => {
+  const task = tasksFor(req.company.id).find((t) => t.id === req.params.id);
+  if (!task) return res.status(404).json({ error: 'Task not found.' });
+  try {
+    const briefing = await runTask(req.company.id, task);
+    res.json({ briefing });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/search', requireAuth, (req, res) => {
+  res.json(search(req.company.id, String(req.query.q || '')));
+});
+
+// ---- Integrations (plugins) -----------------------------------------------
+
+mountPlugins(app, requireAuth);
+
 // ---- Start ----------------------------------------------------------------
 
 seedFirstUser();
+startScheduler();
 app.listen(PORT, () => console.log(`Scenex AI API on http://localhost:${PORT}`));

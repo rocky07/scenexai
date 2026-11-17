@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api.js';
+import logo from '../../logo.png';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -24,7 +25,7 @@ export default function Login({ onLogin }) {
   return (
     <div className="login">
       <form className="login-card" onSubmit={submit}>
-        <div className="brand-mark large">S</div>
+        <img className="login-logo" src={logo} alt="SceneX AI Group" />
         <h1>Log in to Scenex AI</h1>
         <p className="muted">Your AI marketing assistant</p>
 

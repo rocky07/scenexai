@@ -1,10 +1,20 @@
+import Icon from './Icon.jsx';
+
+// Claude-style sidebar: primary navigation at the top, recent chats in the middle, account at the bottom.
+const NAV = [
+  { id: 'chat', label: 'New chat', icon: 'plus' },
+  { id: 'search', label: 'Search', icon: 'search' },
+  { id: 'scheduled', label: 'Scheduled', icon: 'clock' },
+  { id: 'plugins', label: 'Plugins', icon: 'plug' },
+];
+
 export default function Sidebar({
   chats,
   activeChatId,
   activeView,
   companyName,
   userName,
-  onNewChat,
+  onNav,
   onOpenChat,
   onDeleteChat,
   onProfile,
@@ -14,15 +24,25 @@ export default function Sidebar({
     <aside className="sidebar">
       <div className="sidebar-top">
         <div className="brand">
-          <span className="brand-mark">S</span>
+          <img className="brand-logo" src="/logo.png" alt="" />
           <span>Scenex AI</span>
         </div>
-        <button className="btn new-chat" onClick={onNewChat}>
-          <span aria-hidden="true">+</span> New chat
-        </button>
+
+        <nav className="nav" aria-label="Main">
+          {NAV.map((item) => (
+            <button
+              key={item.id}
+              className={`nav-item ${activeView === item.id ? 'active' : ''}`}
+              onClick={() => onNav(item.id)}
+            >
+              <Icon name={item.icon} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
       </div>
 
-      <nav className="chat-list" aria-label="Chats">
+      <nav className="chat-list" aria-label="Recents">
         {chats.length > 0 && <div className="section-label">Recents</div>}
         {chats.map((chat) => (
           <div key={chat.id} className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}>
@@ -36,7 +56,7 @@ export default function Sidebar({
                 if (window.confirm('Delete this chat?')) onDeleteChat(chat.id);
               }}
             >
-              ×
+              <Icon name="close" size={16} />
             </button>
           </div>
         ))}
