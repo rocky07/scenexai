@@ -102,34 +102,38 @@ Open the Amplify URL and log in with `demo@scenex.local` and your `SEED_PASSWORD
 ## Things to know
 
 - **Data:** the database is a JSON file at `server/data/db.json`. Back it up (e.g. `cp` to S3 nightly). Move to Amazon RDS for PostgreSQL before real customers rely on it.
-- **Local AI:** the EC2 mini has no GPU, so **Local AI** will show as offline unless `LOCAL_AI_URL` points at your GPU server, reachable over VPN or Tailscale. Claude works as long as `ANTHROPIC_API_KEY` is set.
+- **Local AI:** the EC2 instance has no GPU, so **Local AI** will show as offline unless `LOCAL_AI_URL` points at your model server, reachable over VPN or Tailscale. Claude works as long as `ANTHROPIC_API_KEY` is set.
 - **Logs:** `journalctl -u scenex-api -f`.
 - **Sessions:** logins are kept in `sessionStorage` per tab and tokens last 7 days.
 
 ## Local AI server (private IP)
 
-The local model runs on your own server at a private IP, for example `10.0.1.25`. The API reaches it at `LOCAL_AI_URL=http://10.0.1.25:11434`. Nothing else should reach it.
+The local model runs on your own server at a private IP, for example `10.0.1.25`. The API reaches it at:
+
+```
+LOCAL_AI_URL=http://10.0.1.25:13000/api/ask
+LOCAL_AI_MODEL=qwen2.5:3b
+```
+
+The server must accept `POST /api/ask` with a JSON body `{ "prompt": "...", "model": "..." }` and reply `{ "response": "..." }`. Nothing else should reach it.
 
 **Network**
 - The GPU server must be able to reach the API's private network. Put it in the same VPC, peer the VPCs, or connect them with a Site-to-Site VPN or Tailscale.
-- Its security group (or firewall) should allow inbound TCP `11434` **only from the API instance's security group or private IP**. Don't open it to `0.0.0.0/0`.
+- Its security group (or firewall) should allow inbound TCP `13000` **only from the API instance's security group or private IP**. Don't open it to `0.0.0.0/0`.
 - It gets no public IP and no inbound SSH from the internet.
 
-**GPU server (Ollama on Linux)**
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-sudo systemctl edit ollama
-#   add under [Service]:
-#   Environment="OLLAMA_HOST=0.0.0.0:11434"
-sudo systemctl daemon-reload && sudo systemctl restart ollama
-ollama pull llama3.1
-```
-`OLLAMA_HOST=0.0.0.0` makes Ollama listen on the private interface. Keep the firewall rule above in place, because Ollama itself has no authentication.
+**Model server**
+Run the server that exposes `POST /api/ask` on port `13000` and listens on the private interface only (not `0.0.0.0` on a public address). Keep the firewall rule above in place, because the server has no login.
+
+If you switch to Ollama instead, set `LOCAL_AI_URL=http://10.0.1.25:11434` (no path). The app then uses Ollama's `/api/chat` route, and you can install it with `curl -fsSL https://ollama.com/install.sh | sh`.
 
 **Check from the API instance**
 ```bash
-curl -s http://10.0.1.25:11434/api/tags     # lists the pulled models
+curl -s -X POST http://10.0.1.25:13000/api/ask \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"Reply with only the words: System online.","model":"qwen2.5:3b"}'
+# expect: {"response":"System online."}
 ```
 Then `sudo systemctl restart scenex-api`. In the app, the **Local AI** option turns green once the API can reach the GPU server.
 
-**Note:** this guide assumes Ollama. If your server runs vLLM, which has an OpenAI-compatible API, the API needs a small adapter in `server/ai.js` before Local AI will work.
+**Note:** the app supports two local servers: the `/api/ask` prompt server above, and Ollama (base URL only). Any other API, such as vLLM's OpenAI-style endpoint, needs an adapter in `server/ai.js`.
