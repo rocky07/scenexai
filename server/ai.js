@@ -1,28 +1,22 @@
-// Two providers behind one function: the company's own local model (Ollama) and the Anthropic API.
+// Two providers behind one function: the company's local model server and the Anthropic API.
 
-const LOCAL_URL = process.env.LOCAL_AI_URL || 'http://localhost:11434';
-const LOCAL_MODEL = process.env.LOCAL_AI_MODEL || 'llama3.1';
+const LOCAL_URL = process.env.LOCAL_AI_URL || 'http://127.0.0.1:13000/api/ask';
+const LOCAL_MODEL = process.env.LOCAL_AI_MODEL || 'qwen2.5:3b';
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-5-5';
 const CLAUDE_KEY = process.env.ANTHROPIC_API_KEY;
 
-// Two local servers are supported:
-// - Ollama: base URL such as http://localhost:11434, uses /api/chat.
-// - A prompt-based server: the full URL ending in /api/ask, takes { prompt, model } and returns { response }.
-const PROMPT_STYLE = /\/api\/ask\/?$/.test(LOCAL_URL);
+// The local server takes a POST to /api/ask with { prompt, model } and replies { response }.
+// LOCAL_AI_URL may be the full /api/ask address or just the server's base address.
+const ASK_URL = /\/api\/ask\/?$/.test(LOCAL_URL) ? LOCAL_URL : `${LOCAL_URL.replace(/\/$/, '')}/api/ask`;
 
 export async function providerStatus() {
   const local = { id: 'local', label: 'Local AI', model: LOCAL_MODEL, available: false };
   const claude = { id: 'claude', label: 'Claude', model: CLAUDE_MODEL, available: Boolean(CLAUDE_KEY) };
 
   try {
-    if (PROMPT_STYLE) {
-      // Any answer at all means the server is up; the prompt endpoint doesn't have a health check.
-      await fetch(new URL('/', LOCAL_URL), { signal: AbortSignal.timeout(1500) });
-      local.available = true;
-    } else {
-      const res = await fetch(`${LOCAL_URL}/api/ask`, { signal: AbortSignal.timeout(1500) });
-      local.available = res.ok;
-    }
+    // The endpoint has no health check. Any HTTP reply, even an error, means the server is listening.
+    await fetch(ASK_URL, { signal: AbortSignal.timeout(1500) });
+    local.available = true;
   } catch {
     local.available = false;
   }
@@ -36,42 +30,22 @@ export async function complete({ provider, system, messages }) {
   throw new Error(`Unknown provider: ${provider}`);
 }
 
+// The local server takes one text prompt, so the system text and the conversation are flattened into it.
 async function callLocal(system, messages) {
-  if (PROMPT_STYLE) return callPromptServer(system, messages);
-
-  const res = await fetch(`${LOCAL_URL}/api/ask`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: LOCAL_MODEL,
-      stream: false,
-      messages: [{ role: 'system', content: system }, ...messages],
-    }),
-    signal: AbortSignal.timeout(120_000),
-  }).catch(() => {
-    throw new Error(`Local AI is not reachable at ${LOCAL_URL}. Is Ollama running?`);
-  });
-  if (!res.ok) throw new Error(`Local AI returned ${res.status}. Is Ollama running at ${LOCAL_URL}?`);
-  const data = await res.json();
-  return data.message.content;
-}
-
-// The prompt-based server takes one text prompt, so the system text and the conversation are flattened into it.
-async function callPromptServer(system, messages) {
   const transcript = messages
     .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
     .join('\n\n');
   const prompt = `${system}\n\n${transcript}\n\nAssistant:`;
 
-  const res = await fetch(LOCAL_URL, {
+  const res = await fetch(ASK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, model: LOCAL_MODEL }),
     signal: AbortSignal.timeout(120_000),
   }).catch(() => {
-    throw new Error(`Local AI is not reachable at ${LOCAL_URL}.`);
+    throw new Error(`Local AI is not reachable at ${ASK_URL}.`);
   });
-  if (!res.ok) throw new Error(`Local AI returned ${res.status} from ${LOCAL_URL}.`);
+  if (!res.ok) throw new Error(`Local AI returned ${res.status} from ${ASK_URL}.`);
   const data = await res.json();
   if (typeof data.response !== 'string') throw new Error('Local AI returned an unexpected reply.');
   return data.response;
