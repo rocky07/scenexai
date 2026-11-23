@@ -148,7 +148,9 @@ function systemPrompt(company) {
   return lines.join('\n\n');
 }
 
-app.post('/api/chats/:id/messages', requireAuth, async (req, res) => {
+// The reply is written in the background. This request returns straight away, because API Gateway
+// gives up after 29 seconds and a local model can take longer. The browser checks the chat until the reply is ready.
+app.post('/api/chats/:id/messages', requireAuth, (req, res) => {
   const chat = ownChat(req, res);
   if (!chat) return;
 
@@ -158,30 +160,47 @@ app.post('/api/chats/:id/messages', requireAuth, async (req, res) => {
 
   const state = db();
   const userMessage = { id: id(), chat_id: chat.id, role: 'user', content, created_at: now() };
-  state.messages.push(userMessage);
+  const assistantMessage = {
+    id: id(),
+    chat_id: chat.id,
+    role: 'assistant',
+    content: '',
+    provider,
+    status: 'pending',
+    created_at: now(),
+  };
+  state.messages.push(userMessage, assistantMessage);
   if (chat.title === 'New chat') chat.title = content.slice(0, 60);
+  chat.updated_at = now();
+  save();
 
-  // Keep the last 30 messages as context so long chats stay within the model's limits.
+  res.status(202).json({ userMessage, assistantMessage, chat });
+  writeReply(req.company, chat.id, assistantMessage.id, provider).catch((err) =>
+    console.error('Reply failed:', err.message),
+  );
+});
+
+// Fills in a pending reply. Failures are stored on the message, so the browser can show them.
+async function writeReply(company, chatId, messageId, provider) {
+  const state = db();
+  const reply = state.messages.find((m) => m.id === messageId);
+  if (!reply) return; // The chat was deleted while the reply was being written.
+
+  // Keep the last 30 finished messages as context so long chats stay within the model's limits.
   const history = state.messages
-    .filter((m) => m.chat_id === chat.id)
+    .filter((m) => m.chat_id === chatId && m.id !== messageId && m.status !== 'pending' && m.status !== 'error')
     .slice(-30)
     .map(({ role, content }) => ({ role, content }));
 
   try {
-    const reply = await complete({ provider, system: systemPrompt(req.company), messages: history });
-    const assistantMessage = { id: id(), chat_id: chat.id, role: 'assistant', content: reply, provider, created_at: now() };
-    state.messages.push(assistantMessage);
-
-    chat.updated_at = now();
-    save();
-    res.json({ userMessage, assistantMessage, chat });
+    reply.content = await complete({ provider, system: systemPrompt(company), messages: history });
+    reply.status = 'done';
   } catch (err) {
-    // Keep the user's message so they can retry with the other provider.
-    chat.updated_at = now();
-    save();
-    res.status(502).json({ error: err.message, userMessage });
+    reply.status = 'error';
+    reply.error = err.message;
   }
-});
+  save();
+}
 
 // ---- Scheduled briefings and search ----------------------------------------
 
@@ -217,5 +236,15 @@ mountPlugins(app, requireAuth);
 // ---- Start ----------------------------------------------------------------
 
 seedFirstUser();
+
+// A reply that was still being written when the server stopped can't finish now. Mark it so the browser stops waiting.
+for (const m of db().messages) {
+  if (m.status === 'pending') {
+    m.status = 'error';
+    m.error = 'The server restarted before this reply finished. Please send the message again.';
+  }
+}
+save();
+
 startScheduler();
 app.listen(PORT, () => console.log(`Scenex AI API on http://localhost:${PORT}`));

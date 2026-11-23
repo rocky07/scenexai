@@ -3,6 +3,8 @@ import { api } from '../api.js';
 import ProviderSwitch from './ProviderSwitch.jsx';
 
 const PROVIDER_KEY = 'scenex.provider';
+// How often to check whether a reply is ready. Each check is a short request, so the gateway never times out.
+const POLL_MS = 2500;
 
 function greeting(firstName) {
   const hour = new Date().getHours();
@@ -23,10 +25,13 @@ export default function Chat({ chatId, firstName, companyName, onChatSaved }) {
   const [providers, setProviders] = useState([]);
   const [provider, setProvider] = useState(savedProvider() || 'local');
   const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
+  const [sending, setSending] = useState(false); // the message is being saved
+  const [waitingFor, setWaitingFor] = useState(null); // { chatId, messageId } while a reply is being written
   const [error, setError] = useState('');
   const loadedChatId = useRef(null);
   const endRef = useRef(null);
+
+  const busy = sending || Boolean(waitingFor);
 
   // Load the model list once and pick a usable provider if the saved one is offline.
   useEffect(() => {
@@ -48,20 +53,50 @@ export default function Chat({ chatId, firstName, companyName, onChatSaved }) {
     }
   }, [provider]);
 
-  // Load history when opening an existing chat. Skip the reload right after we created it.
+  // Load history when opening an existing chat. If a reply was still being written, keep waiting for it.
   useEffect(() => {
-    setError('');
     if (!chatId) {
       loadedChatId.current = null;
       setMessages([]);
+      setWaitingFor(null);
+      setError('');
       return;
     }
+    // Skip the reload right after we created the chat ourselves.
     if (loadedChatId.current === chatId) return;
+
+    setError('');
+    setWaitingFor(null);
     api(`/chats/${chatId}`).then(({ messages }) => {
       loadedChatId.current = chatId;
       setMessages(messages);
+      const pending = messages.find((m) => m.status === 'pending');
+      if (pending) setWaitingFor({ chatId, messageId: pending.id });
     });
   }, [chatId]);
+
+  // While a reply is being written, check the chat until it's ready.
+  useEffect(() => {
+    if (!waitingFor) return undefined;
+    let stopped = false;
+    const timer = setInterval(async () => {
+      try {
+        const { messages: latest } = await api(`/chats/${waitingFor.chatId}`);
+        if (stopped) return;
+        const reply = latest.find((m) => m.id === waitingFor.messageId);
+        if (reply && reply.status !== 'pending') {
+          setMessages(latest);
+          setWaitingFor(null);
+        }
+      } catch (err) {
+        if (!stopped) setError(err.message);
+      }
+    }, POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [waitingFor]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -70,7 +105,7 @@ export default function Chat({ chatId, firstName, companyName, onChatSaved }) {
   async function send(e) {
     e?.preventDefault();
     const content = input.trim();
-    if (!content || sending) return;
+    if (!content || busy) return;
 
     setInput('');
     setError('');
@@ -88,9 +123,11 @@ export default function Chat({ chatId, firstName, companyName, onChatSaved }) {
         onChatSaved(chat);
       }
 
+      // The server saves the message and answers at once with a pending reply. The reply is filled in by polling.
       const data = await api(`/chats/${id}/messages`, { method: 'POST', body: { content, provider } });
       setMessages((list) => [...list.filter((m) => m.id !== pendingId), data.userMessage, data.assistantMessage]);
       onChatSaved(data.chat);
+      setWaitingFor({ chatId: id, messageId: data.assistantMessage.id });
     } catch (err) {
       // The server keeps the user's message on failure; show it and the reason.
       const saved = err.data?.userMessage;
@@ -118,8 +155,8 @@ export default function Chat({ chatId, firstName, companyName, onChatSaved }) {
         aria-label="Message"
       />
       <div className="composer-bar">
-        <ProviderSwitch providers={providers} value={provider} onChange={setProvider} disabled={sending} />
-        <button className="send-btn" disabled={sending || !input.trim()} aria-label="Send message">
+        <ProviderSwitch providers={providers} value={provider} onChange={setProvider} disabled={busy} />
+        <button className="send-btn" disabled={busy || !input.trim()} aria-label="Send message">
           ↑
         </button>
       </div>
@@ -141,8 +178,18 @@ export default function Chat({ chatId, firstName, companyName, onChatSaved }) {
       <div className="thread">
         {messages.map((m) => (
           <div key={m.id} className={`message ${m.role}`}>
-            <div className="bubble">{m.content}</div>
-            {m.role === 'assistant' && m.provider && (
+            {m.status === 'pending' ? (
+              <div className="bubble typing">
+                <span />
+                <span />
+                <span />
+              </div>
+            ) : m.status === 'error' ? (
+              <div className="bubble error">Couldn’t write this reply. {m.error}</div>
+            ) : (
+              <div className="bubble">{m.content}</div>
+            )}
+            {m.role === 'assistant' && m.provider && m.status !== 'pending' && (
               <div className="meta">Written by {m.provider === 'claude' ? 'Claude' : 'local AI'}</div>
             )}
           </div>
