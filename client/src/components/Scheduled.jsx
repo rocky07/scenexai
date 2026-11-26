@@ -39,6 +39,11 @@ export default function Scheduled({ briefingId }) {
     loadAccounts().catch((err) => setError(err.message));
   }, []);
 
+  // Opening a briefing from the sidebar while this page is already showing.
+  useEffect(() => {
+    if (briefingId) setOpenId(briefingId);
+  }, [briefingId]);
+
   async function update(task, changes) {
     setError('');
     try {

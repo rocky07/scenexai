@@ -1661,3 +1661,20 @@ textarea:focus {
   display: grid;
   gap: 2px;
 }
+
+.recent-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.recent-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-link .icon {
+  color: var(--muted);
+}

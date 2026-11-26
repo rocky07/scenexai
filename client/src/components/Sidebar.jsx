@@ -1,4 +1,5 @@
 import Icon from './Icon.jsx';
+import logo from '../../logo.png';
 
 // Claude-style sidebar: primary navigation at the top, recent chats in the middle, account at the bottom.
 const NAV = [
@@ -11,21 +12,29 @@ const NAV = [
 
 export default function Sidebar({
   chats,
+  briefings = [],
   activeChatId,
+  activeBriefingId,
   activeView,
   companyName,
   userName,
   onNav,
   onOpenChat,
+  onOpenBriefing,
   onDeleteChat,
   onProfile,
   onLogout,
 }) {
+  // Chats and briefings share the Recents list, newest first.
+  const recents = [
+    ...chats.map((c) => ({ kind: 'chat', id: c.id, title: c.title, when: c.updated_at })),
+    ...briefings.map((b) => ({ kind: 'briefing', id: b.id, title: b.title, when: b.created_at })),
+  ].sort((a, b) => b.when.localeCompare(a.when));
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
         <div className="brand">
-          <img className="brand-logo" src="/logo.png" alt="" />
+          <img className="brand-logo" src={logo} alt="" />
           <span>Scenex AI</span>
         </div>
 
@@ -44,23 +53,36 @@ export default function Sidebar({
       </div>
 
       <nav className="chat-list" aria-label="Recents">
-        {chats.length > 0 && <div className="section-label">Recents</div>}
-        {chats.map((chat) => (
-          <div key={chat.id} className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}>
-            <button className="chat-link" onClick={() => onOpenChat(chat.id)} title={chat.title}>
-              {chat.title}
-            </button>
-            <button
-              className="icon-btn small"
-              aria-label={`Delete ${chat.title}`}
-              onClick={() => {
-                if (window.confirm('Delete this chat?')) onDeleteChat(chat.id);
-              }}
+        {recents.length > 0 && <div className="section-label">Recents</div>}
+        {recents.map((item) =>
+          item.kind === 'chat' ? (
+            <div key={`chat-${item.id}`} className={`chat-item ${item.id === activeChatId ? 'active' : ''}`}>
+              <button className="chat-link recent-link" onClick={() => onOpenChat(item.id)} title={item.title}>
+                <Icon name="chat" size={16} />
+                <span>{item.title}</span>
+              </button>
+              <button
+                className="icon-btn small"
+                aria-label={`Delete ${item.title}`}
+                onClick={() => {
+                  if (window.confirm('Delete this chat?')) onDeleteChat(item.id);
+                }}
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+          ) : (
+            <div
+              key={`briefing-${item.id}`}
+              className={`chat-item ${item.id === activeBriefingId ? 'active' : ''}`}
             >
-              <Icon name="close" size={16} />
-            </button>
-          </div>
-        ))}
+              <button className="chat-link recent-link" onClick={() => onOpenBriefing(item.id)} title={item.title}>
+                <Icon name="clock" size={16} />
+                <span>{item.title}</span>
+              </button>
+            </div>
+          ),
+        )}
       </nav>
 
       <div className="sidebar-bottom">

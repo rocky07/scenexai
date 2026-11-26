@@ -19,13 +19,21 @@ export default function Shell({ session, onCompanyChange, onLogout }) {
     return params.has('plugin') ? { name: 'plugins', pluginId: params.get('plugin') } : { name: 'chat' };
   });
   const [chats, setChats] = useState([]);
+  const [briefings, setBriefings] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const firstName = session.user.name.split(' ')[0];
 
   useEffect(() => {
     api('/chats').then((data) => setChats(data.chats));
+    loadBriefings();
   }, []);
+
+  function loadBriefings() {
+    api('/scheduled')
+      .then((data) => setBriefings(data.briefings))
+      .catch(() => {});
+  }
 
   function upsertChat(chat) {
     setChats((list) => [chat, ...list.filter((c) => c.id !== chat.id)]);
@@ -34,6 +42,7 @@ export default function Shell({ session, onCompanyChange, onLogout }) {
   function go(next) {
     setView(next);
     setSidebarOpen(false);
+    loadBriefings(); // keep the Recents list current when a briefing is created or deleted
   }
 
   function navigate(id) {
@@ -52,6 +61,9 @@ export default function Shell({ session, onCompanyChange, onLogout }) {
     <div className={`shell ${sidebarOpen ? 'sidebar-open' : ''}`}>
       <Sidebar
         chats={chats}
+        briefings={briefings}
+        activeBriefingId={view.name === 'scheduled' ? view.briefingId : null}
+        onOpenBriefing={(id) => go({ name: 'scheduled', briefingId: id })}
         activeChatId={view.name === 'chat' ? view.chatId : null}
         activeView={sidebarActive}
         companyName={session.company.name}
