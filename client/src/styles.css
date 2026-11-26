@@ -1625,3 +1625,27 @@ textarea:focus {
 .idea-result p {
   margin: 0;
 }
+
+/* ---- Drafts screen -------------------------------------------------- */
+
+.draft-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.draft-edit {
+  resize: vertical;
+  min-height: 110px;
+}
+
+.small-note {
+  font-size: 13px;
+  margin: 0;
+}
+
+.save-draft {
+  justify-self: start;
+}

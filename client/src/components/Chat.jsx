@@ -32,6 +32,16 @@ export default function Chat({ chatId, firstName, companyName, onChatSaved }) {
   const endRef = useRef(null);
 
   const busy = sending || Boolean(waitingFor);
+  const [savedIds, setSavedIds] = useState({}); // message id -> true once saved as a draft
+
+  async function saveDraft(message) {
+    try {
+      await api('/drafts', { method: 'POST', body: { text: message.content, source: 'chat' } });
+      setSavedIds((s) => ({ ...s, [message.id]: true }));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   // Load the model list once and pick a usable provider if the saved one is offline.
   useEffect(() => {
@@ -191,6 +201,11 @@ export default function Chat({ chatId, firstName, companyName, onChatSaved }) {
             )}
             {m.role === 'assistant' && m.provider && m.status !== 'pending' && (
               <div className="meta">Written by {m.provider === 'claude' ? 'Claude' : 'local AI'}</div>
+            )}
+            {m.role === 'assistant' && m.status === 'done' && m.content && (
+              <button className="btn small ghost save-draft" disabled={savedIds[m.id]} onClick={() => saveDraft(m)}>
+                {savedIds[m.id] ? 'Saved to Drafts' : 'Save draft'}
+              </button>
             )}
           </div>
         ))}

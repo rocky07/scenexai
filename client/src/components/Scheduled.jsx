@@ -179,6 +179,16 @@ function IdeaPost({ briefingId, index, post, accounts }) {
   const [chosen, setChosen] = useState([]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  async function saveDraft() {
+    try {
+      await api('/drafts', { method: 'POST', body: { text: post.text, source: 'idea' } });
+      setSaved(true);
+    } catch (err) {
+      setResult({ publications: [], errors: [{ account: '', message: err.message }] });
+    }
+  }
 
   function toggle(key) {
     setChosen((list) => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key]));
@@ -220,9 +230,14 @@ function IdeaPost({ briefingId, index, post, accounts }) {
               </label>
             ))}
           </div>
-          <button className="btn small primary" disabled={busy || chosen.length === 0} onClick={postNow}>
-            {busy ? 'Posting…' : 'Post now'}
-          </button>
+          <div className="draft-buttons">
+            <button className="btn small ghost" disabled={saved} onClick={saveDraft}>
+              {saved ? 'Saved to Drafts' : 'Save draft'}
+            </button>
+            <button className="btn small primary" disabled={busy || chosen.length === 0} onClick={postNow}>
+              {busy ? 'Posting…' : 'Post now'}
+            </button>
+          </div>
         </div>
       )}
 

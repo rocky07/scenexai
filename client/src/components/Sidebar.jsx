@@ -5,6 +5,7 @@ const NAV = [
   { id: 'chat', label: 'New chat', icon: 'plus' },
   { id: 'search', label: 'Search', icon: 'search' },
   { id: 'scheduled', label: 'Scheduled', icon: 'clock' },
+  { id: 'drafts', label: 'Drafts', icon: 'file' },
   { id: 'plugins', label: 'Plugins', icon: 'plug' },
 ];
 

@@ -6,8 +6,9 @@ import Profile from './Profile.jsx';
 import Search from './Search.jsx';
 import Scheduled from './Scheduled.jsx';
 import Plugins from './Plugins.jsx';
+import Drafts from './Drafts.jsx';
 
-const TITLES = { search: 'Search', scheduled: 'Scheduled', plugins: 'Plugins', profile: 'Company profile' };
+const TITLES = { search: 'Search', scheduled: 'Scheduled', drafts: 'Drafts', plugins: 'Plugins', profile: 'Company profile' };
 
 // Layout: sidebar on the left, the active screen on the right.
 export default function Shell({ session, onCompanyChange, onLogout }) {
@@ -84,6 +85,8 @@ export default function Shell({ session, onCompanyChange, onLogout }) {
         )}
 
         {view.name === 'scheduled' && <Scheduled briefingId={view.briefingId} />}
+
+        {view.name === 'drafts' && <Drafts />}
 
         {view.name === 'plugins' && <Plugins pluginId={view.pluginId} tab={view.tab} onNavigate={go} />}
 

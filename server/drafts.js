@@ -31,8 +31,7 @@ export async function publishToTargets(companyId, text, targets, { auto = false,
     text,
     publications: [],
     errors: [],
-    auto,
-    source,
+    source: auto ? 'auto' : 'idea',
     created_at: now,
     updated_at: now,
   };
@@ -54,6 +53,35 @@ export async function publishToTargets(companyId, text, targets, { auto = false,
   drafts().push(draft);
   save();
   return draft;
+}
+
+// Publishes an existing draft to each target and records every result on the draft.
+async function publishDraftTo(companyId, draft, targets) {
+  const failures = [];
+  let published = 0;
+  for (const target of targets) {
+    const plugin = pluginById(String(target.plugin_id || ''));
+    if (!plugin?.capabilities?.publish) {
+      failures.push({ plugin_id: target.plugin_id, account: '', message: 'That account cannot publish posts.' });
+      continue;
+    }
+    const conn = connectionWithToken(companyId, plugin.id, String(target.connection_id || ''));
+    if (!conn) {
+      failures.push({ plugin_id: plugin.id, account: '', message: 'Account not found. Connect it on the Setup tab.' });
+      continue;
+    }
+    try {
+      const { post_id } = await plugin.publish(conn, draft.text);
+      draft.publications.push({ plugin_id: plugin.id, account: conn.name, post_id, published_at: new Date().toISOString() });
+      published += 1;
+    } catch (err) {
+      failures.push({ plugin_id: plugin.id, account: conn.name, message: err.message, needs_reconnect: Boolean(err.reconnect) });
+    }
+  }
+  draft.errors = failures;
+  draft.updated_at = new Date().toISOString();
+  save();
+  return { published, failures };
 }
 
 export function mountDrafts(app, requireAuth) {
@@ -99,7 +127,9 @@ export function mountDrafts(app, requireAuth) {
       id: crypto.randomUUID(),
       company_id: req.company.id,
       text,
+      source: ['chat', 'idea'].includes(req.body?.source) ? req.body.source : 'manual',
       publications: [],
+      errors: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -130,21 +160,15 @@ export function mountDrafts(app, requireAuth) {
     const draft = ownDraft(req.company.id, req.params.id);
     if (!draft) return res.status(404).json({ error: 'Draft not found.' });
 
-    const plugin = pluginById(String(req.body?.plugin_id || ''));
-    if (!plugin?.capabilities?.publish) return res.status(400).json({ error: 'That account cannot publish posts.' });
+    // Accepts { targets: [{ plugin_id, connection_id }, ...] }, or one target as plugin_id + connection_id.
+    const targets = Array.isArray(req.body?.targets)
+      ? req.body.targets
+      : req.body?.plugin_id
+        ? [{ plugin_id: req.body.plugin_id, connection_id: req.body.connection_id }]
+        : [];
+    if (targets.length === 0) return res.status(400).json({ error: 'Choose at least one account.' });
 
-    const conn = connectionWithToken(req.company.id, plugin.id, String(req.body?.connection_id || ''));
-    if (!conn) return res.status(404).json({ error: 'Account not found. Connect it on the Setup tab.' });
-
-    try {
-      const { post_id } = await plugin.publish(conn, draft.text);
-      const now = new Date().toISOString();
-      draft.publications.push({ plugin_id: plugin.id, account: conn.name, post_id, published_at: now });
-      draft.updated_at = now;
-      save();
-      res.json({ draft });
-    } catch (err) {
-      res.status(err.reconnect ? 401 : 502).json({ error: err.message, needs_reconnect: Boolean(err.reconnect) });
-    }
+    const results = await publishDraftTo(req.company.id, draft, targets.slice(0, 10));
+    res.json({ draft, ...results });
   });
 }
