@@ -4,6 +4,7 @@ import { db, save } from './store.js';
 import { complete } from './ai.js';
 import { plugins } from './plugins/index.js';
 import { connectionsFor, connectionWithToken } from './plugins/shared.js';
+import { publishToTargets } from './drafts.js';
 
 // Times use the server's clock. Set TZ in the environment (for example TZ=America/New_York) to match your team.
 export const KINDS = {
@@ -29,7 +30,9 @@ export const KINDS = {
     hour: 9,
     weekday: 3,
     prompt:
-      'Suggest five social media post ideas for the coming week. For each give a hook and a one-line caption that fits the brand voice. Mark each as a draft for the owner to approve.',
+      'Write three social media posts for the coming week that fit the brand voice. Reply with only a JSON array, ' +
+      'no other text. Each item must be an object with "hook" (a short title) and "text" (the ready-to-publish post, ' +
+      'under 280 characters, no hashtags unless they fit naturally).',
   },
 };
 
@@ -140,6 +143,25 @@ async function gatherContext(company) {
 }
 
 // Tries Claude first when a key is set, then falls back to the local model if Claude fails.
+// Pulls the structured posts out of a content-ideas reply. Returns [] if the reply isn't valid JSON.
+export function parsePosts(text) {
+  const match = String(text).match(/\[[\s\S]*\]/);
+  if (!match) return [];
+  try {
+    return JSON.parse(match[0])
+      .filter((item) => item && typeof item.text === 'string' && item.text.trim())
+      .slice(0, 5)
+      .map((item) => ({ hook: String(item.hook || '').slice(0, 120), text: item.text.trim().slice(0, 1000) }));
+  } catch {
+    return [];
+  }
+}
+
+function readable(posts, fallback) {
+  if (!posts.length) return fallback;
+  return posts.map((p, i) => `${i + 1}. ${p.hook}\n${p.text}`).join('\n\n');
+}
+
 async function generate(company, kind) {
   const context = await gatherContext(company);
   const system = [
@@ -161,23 +183,38 @@ async function generate(company, kind) {
   throw new Error(errors.join(' | '));
 }
 
+const MAX_AUTO_POSTS = 3;
+
+// Publishes up to MAX_AUTO_POSTS posts from a briefing to the owner's chosen accounts.
+async function autoPublish(company, briefing) {
+  for (const post of briefing.posts.slice(0, MAX_AUTO_POSTS)) {
+    await publishToTargets(company.id, post.text, company.auto_post.targets, { auto: true, source: briefing.id });
+  }
+}
+
 export async function runTask(companyId, task) {
   const state = tables();
   const company = state.companies.find((c) => c.id === companyId);
   const now = new Date().toISOString();
   try {
     const { content, provider, fellBack } = await generate(company, task.kind);
+    const posts = task.kind === 'content_ideas' ? parsePosts(content) : [];
     const briefing = {
       id: crypto.randomUUID(),
       company_id: companyId,
       kind: task.kind,
       title: KINDS[task.kind].title,
-      content,
+      content: readable(posts, content),
+      posts,
       provider,
       created_at: now,
     };
     state.briefings.push(briefing);
     state.briefings = state.briefings.slice(-500);
+    // Auto-post runs only if the owner turned it on for this company.
+    if (posts.length && company.auto_post?.enabled && company.auto_post.targets?.length) {
+      autoPublish(company, briefing).catch((err) => console.error('Auto-post failed:', err.message));
+    }
     // Say so when the local model wrote it, so the owner knows why it differs.
     task.note = fellBack ? 'Claude was unavailable, so the local model wrote the last briefing.' : null;
     task.last_error = null;

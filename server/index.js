@@ -206,7 +206,11 @@ async function writeReply(company, chatId, messageId, provider) {
 // ---- Scheduled briefings and search ----------------------------------------
 
 app.get('/api/scheduled', requireAuth, (req, res) => {
-  res.json({ tasks: tasksFor(req.company.id), briefings: briefingsFor(req.company.id) });
+  res.json({
+    tasks: tasksFor(req.company.id),
+    briefings: briefingsFor(req.company.id),
+    auto_post: req.company.auto_post || { enabled: false, targets: [] },
+  });
 });
 
 app.put('/api/scheduled/:id', requireAuth, (req, res) => {

@@ -40,14 +40,14 @@ const facebook = {
       help: 'Any random string. Enter the same value in the Meta webhook settings.',
     },
   ],
-  capabilities: { inbox: true, webhook: true, feed: true },
+  capabilities: { inbox: true, webhook: true, feed: true, publish: true },
 
   loginUrl({ config, redirectUri, state }) {
     const url = new URL(`https://www.facebook.com/${VERSION}/dialog/oauth`);
     url.searchParams.set('client_id', config.app_id);
     url.searchParams.set('redirect_uri', redirectUri);
     url.searchParams.set('state', state);
-    url.searchParams.set('scope', ['pages_show_list', 'pages_messaging', 'pages_manage_metadata', 'pages_read_engagement'].join(','));
+    url.searchParams.set('scope', ['pages_show_list', 'pages_messaging', 'pages_manage_metadata', 'pages_read_engagement', 'pages_manage_posts'].join(','));
     return url.toString();
   },
 
@@ -116,6 +116,16 @@ const facebook = {
       });
       return { message_id: sent.message_id };
     },
+  },
+
+  // Publishes a text post to the Page. Needs pages_manage_posts.
+  async publish(conn, text) {
+    const data = await graph(`${conn.external_id}/feed`, {
+      method: 'POST',
+      token: conn.token,
+      params: { message: text },
+    });
+    return { post_id: data.id };
   },
 
   // Recent Page posts with engagement, and the top comments on each. Needs pages_read_engagement.

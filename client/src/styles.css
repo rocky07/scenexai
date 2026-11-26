@@ -1550,3 +1550,78 @@ textarea:focus {
   font-size: 14px;
   line-height: 1.5;
 }
+
+/* ---- Content ideas and auto-post ------------------------------------ */
+
+.autopost {
+  display: grid;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+
+.autopost h2 {
+  font-family: var(--serif);
+  font-size: 19px;
+  margin-bottom: 4px;
+}
+
+.autopost p {
+  margin: 0;
+}
+
+.idea-list {
+  display: grid;
+  gap: 12px;
+}
+
+.idea {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.idea-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.idea-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.idea-accounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.idea-account {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.idea-account input {
+  width: auto;
+}
+
+.idea-result {
+  display: grid;
+  gap: 4px;
+}
+
+.idea-result p {
+  margin: 0;
+}
