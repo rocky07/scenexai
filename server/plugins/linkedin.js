@@ -1,7 +1,7 @@
 // LinkedIn plugin. Connects a LinkedIn member account with "Sign In with LinkedIn" (OpenID Connect) and
 // "Share on LinkedIn" (w_member_social), which lets the app publish posts as that member.
 // LinkedIn's messaging API is limited to approved partners, so there is no inbox.
-const VERSION = process.env.LINKEDIN_API_VERSION || '202506'; // LinkedIn-Version header, YYYYMM
+const VERSION = process.env.LINKEDIN_API_VERSION || '202611'; // LinkedIn-Version header, YYYYMM; must be an active version
 
 // Thrown when LinkedIn no longer accepts the saved login, so the UI can ask the person to reconnect.
 export class ReconnectError extends Error {
@@ -9,6 +9,39 @@ export class ReconnectError extends Error {
     super(message);
     this.reconnect = true;
   }
+}
+
+// Fallback for apps that the Posts API refuses (403). Uses the older ugcPosts endpoint.
+async function publishWithShareApi(conn, text) {
+  const res = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${conn.token}`,
+      'X-Restli-Protocol-Version': '2.0.0',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      author: `urn:li:person:${conn.external_id}`,
+      lifecycleState: 'PUBLISHED',
+      specificContent: {
+        'com.linkedin.ugc.ShareContent': {
+          shareCommentary: { text },
+          shareMediaCategory: 'NONE',
+        },
+      },
+      visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (res.status === 401) {
+    throw new ReconnectError('LinkedIn rejected the saved login. Reconnect LinkedIn on the Setup tab.');
+  }
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`LinkedIn: publish failed (${res.status}) ${detail.slice(0, 200)}`);
+  }
+  const data = await res.json().catch(() => ({}));
+  return { post_id: data.id || res.headers.get('x-restli-id') };
 }
 
 const linkedin = {
@@ -58,6 +91,10 @@ const linkedin = {
 
     if (res.status === 401) {
       throw new ReconnectError('LinkedIn rejected the saved login. Reconnect LinkedIn on the Setup tab.');
+    }
+    if (res.status === 403) {
+      // The Posts API is limited for some apps. The older share endpoint works with w_member_social alone.
+      return publishWithShareApi(conn, text);
     }
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
