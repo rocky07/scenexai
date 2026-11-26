@@ -90,7 +90,12 @@ export default function Scheduled({ briefingId }) {
       <p className="muted">Briefings are written on a schedule from your company profile, connected accounts and recent chats.</p>
       {error && <div className="error">{error}</div>}
 
-      <AutoPostCard accounts={accounts} initial={data.auto_post} onError={setError} />
+      <AutoPostCard
+        accounts={accounts}
+        initial={data.auto_post}
+        allowed={Boolean(data.auto_post_allowed)}
+        onError={setError}
+      />
 
       <div className="task-grid">
         {data.tasks.map((task) => (
@@ -283,7 +288,7 @@ function IdeaPost({ briefingId, index, post, accounts }) {
 }
 
 // Auto-post: when on, new content ideas are posted to the accounts chosen here, up to 3 per run.
-function AutoPostCard({ accounts, initial, onError }) {
+function AutoPostCard({ accounts, initial, allowed, onError }) {
   const [enabled, setEnabled] = useState(Boolean(initial?.enabled));
   const [chosen, setChosen] = useState(initial?.targets?.map(targetKey) || []);
   const [saving, setSaving] = useState(false);
@@ -334,6 +339,7 @@ function AutoPostCard({ accounts, initial, onError }) {
             When on, each new set of content ideas is published to the accounts below without waiting for approval,
             up to 3 posts per run. Review ideas before turning this on. Turn it off at any time.
           </p>
+          {!allowed && <p className="hint">Auto-post is managed by Scenex AI. Contact us to turn it on for your account.</p>}
         </div>
         <span className={`status-pill ${enabled ? 'on' : ''}`}>{enabled ? 'On' : 'Off'}</span>
       </div>
@@ -352,7 +358,7 @@ function AutoPostCard({ accounts, initial, onError }) {
         <button className="btn" disabled={saving} onClick={() => save(false)}>
           Turn off
         </button>
-        <button className="btn primary" disabled={saving} onClick={() => save(true)}>
+        <button className="btn primary" disabled={saving || (!allowed && !enabled)} onClick={() => save(true)}>
           {enabled ? 'Save accounts' : 'Turn on auto-post'}
         </button>
       </div>

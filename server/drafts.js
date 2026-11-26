@@ -102,6 +102,10 @@ export function mountDrafts(app, requireAuth) {
   });
 
   app.put('/api/auto-post', requireAuth, (req, res) => {
+    // Auto-post is switched on by Scenex AI admins for each company.
+    if (req.body?.enabled && !req.company.auto_post_allowed) {
+      return res.status(403).json({ error: 'Auto-post is not enabled for your account. Contact Scenex AI to turn it on.' });
+    }
     const valid = (Array.isArray(req.body?.targets) ? req.body.targets : [])
       .filter((t) => {
         const plugin = pluginById(String(t?.plugin_id || ''));

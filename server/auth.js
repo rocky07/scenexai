@@ -37,13 +37,25 @@ export function requireAuth(req, res, next) {
 
   const user = state.users.find((u) => u.id === session.userId);
   if (!user) return res.status(401).json({ error: 'Please log in again.' });
+  if (user.active === false) return res.status(403).json({ error: 'This account has been disabled.' });
+
+  const company = state.companies.find((c) => c.id === user.company_id);
+  if (company?.active === false) return res.status(403).json({ error: 'This company account has been disabled.' });
 
   req.token = token;
   req.user = user;
-  req.company = state.companies.find((c) => c.id === user.company_id);
+  req.company = company;
   next();
 }
 
+// For admin screens: the signed-in user must have the admin role.
+export function requireAdmin(req, res, next) {
+  requireAuth(req, res, () => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admins only.' });
+    next();
+  });
+}
+
 export function publicUser(user) {
-  return { id: user.id, email: user.email, name: user.name, company_id: user.company_id };
+  return { id: user.id, email: user.email, name: user.name, company_id: user.company_id, role: user.role || 'customer' };
 }

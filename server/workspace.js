@@ -5,6 +5,7 @@ import { complete } from './ai.js';
 import { plugins } from './plugins/index.js';
 import { connectionsFor, connectionWithToken } from './plugins/shared.js';
 import { publishToTargets } from './drafts.js';
+import { companyAnthropicKey } from './accounts.js';
 
 // Times use the server's clock. Set TZ in the environment (for example TZ=America/New_York) to match your team.
 export const KINDS = {
@@ -170,11 +171,12 @@ async function generate(company, kind) {
   ].join(' ');
   const messages = [{ role: 'user', content: `${KINDS[kind].prompt}\n\nContext:\n${context}` }];
 
-  const order = process.env.ANTHROPIC_API_KEY ? ['claude', 'local'] : ['local'];
+  const anthropicKey = companyAnthropicKey(company);
+  const order = anthropicKey || process.env.ANTHROPIC_API_KEY ? ['claude', 'local'] : ['local'];
   const errors = [];
   for (const provider of order) {
     try {
-      const content = await complete({ provider, system, messages });
+      const content = await complete({ provider, system, messages, anthropicKey });
       return { content, provider, fellBack: errors.length > 0 };
     } catch (err) {
       errors.push(`${provider}: ${err.message}`);

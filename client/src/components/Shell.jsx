@@ -7,8 +7,9 @@ import Search from './Search.jsx';
 import Scheduled from './Scheduled.jsx';
 import Plugins from './Plugins.jsx';
 import Drafts from './Drafts.jsx';
+import Admin from './Admin.jsx';
 
-const TITLES = { search: 'Search', scheduled: 'Scheduled', drafts: 'Drafts', plugins: 'Plugins', profile: 'Company profile' };
+const TITLES = { search: 'Search', scheduled: 'Scheduled', drafts: 'Drafts', plugins: 'Plugins', admin: 'Admin', profile: 'Company profile' };
 
 // Layout: sidebar on the left, the active screen on the right.
 export default function Shell({ session, onCompanyChange, onLogout }) {
@@ -62,6 +63,7 @@ export default function Shell({ session, onCompanyChange, onLogout }) {
       <Sidebar
         chats={chats}
         briefings={briefings}
+        isAdmin={session.user.role === 'admin'}
         activeBriefingId={view.name === 'scheduled' ? view.briefingId : null}
         onOpenBriefing={(id) => go({ name: 'scheduled', briefingId: id })}
         activeChatId={view.name === 'chat' ? view.chatId : null}
@@ -99,6 +101,8 @@ export default function Shell({ session, onCompanyChange, onLogout }) {
         {view.name === 'scheduled' && <Scheduled briefingId={view.briefingId} />}
 
         {view.name === 'drafts' && <Drafts />}
+
+        {view.name === 'admin' && session.user.role === 'admin' && <Admin />}
 
         {view.name === 'plugins' && <Plugins pluginId={view.pluginId} tab={view.tab} onNavigate={go} />}
 

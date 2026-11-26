@@ -1678,3 +1678,70 @@ textarea:focus {
 .recent-link .icon {
   color: var(--muted);
 }
+
+/* ---- Admin ---------------------------------------------------------- */
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.admin-grid label,
+.admin-section label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.admin-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.admin-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.admin-section {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.admin-section .hint {
+  margin: 0;
+}
+
+.admin-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-inline input {
+  width: auto;
+  min-width: 180px;
+}
+
+.admin-user {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-tag {
+  margin-left: 8px;
+  font-size: 11px;
+  padding: 2px 8px;
+}

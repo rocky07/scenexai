@@ -13,6 +13,7 @@ const NAV = [
 export default function Sidebar({
   chats,
   briefings = [],
+  isAdmin = false,
   activeChatId,
   activeBriefingId,
   activeView,
@@ -39,7 +40,7 @@ export default function Sidebar({
         </div>
 
         <nav className="nav" aria-label="Main">
-          {NAV.map((item) => (
+          {[...NAV, ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: 'user' }] : [])].map((item) => (
             <button
               key={item.id}
               className={`nav-item ${activeView === item.id ? 'active' : ''}`}

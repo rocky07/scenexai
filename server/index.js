@@ -3,6 +3,8 @@ import express from 'express';
 import { db, save } from './store.js';
 import { hashPassword, verifyPassword, createSession, deleteSession, requireAuth, publicUser } from './auth.js';
 import { providerStatus, complete } from './ai.js';
+import { publicCompany, companyAnthropicKey } from './accounts.js';
+import { mountAdmin } from './admin-routes.js';
 import { mountPlugins } from './plugin-routes.js';
 import { mountDrafts } from './drafts.js';
 import { tasksFor, updateTask, briefingsFor, runTask, search, startScheduler } from './workspace.js';
@@ -43,6 +45,8 @@ function seedFirstUser() {
     brand_voice: '',
     target_audience: '',
     created_at: now(),
+    active: true,
+    auto_post_allowed: false,
   });
   state.users.push({
     id: id(),
@@ -50,6 +54,8 @@ function seedFirstUser() {
     email: process.env.SEED_EMAIL || 'demo@scenex.local',
     name: 'Demo User',
     password: hashPassword(process.env.SEED_PASSWORD || 'changeme123'),
+    role: 'admin',
+    active: true,
   });
   save();
   console.log(`Seeded login: ${process.env.SEED_EMAIL || 'demo@scenex.local'} (set SEED_PASSWORD to change the password)`);
@@ -64,9 +70,11 @@ app.post('/api/auth/login', (req, res) => {
   if (!user || !verifyPassword(password, user.password)) {
     return res.status(401).json({ error: 'Wrong email or password.' });
   }
-  const token = createSession(user.id);
   const company = state.companies.find((c) => c.id === user.company_id);
-  res.json({ token, user: publicUser(user), company });
+  if (user.active === false) return res.status(403).json({ error: 'This account has been disabled.' });
+  if (company?.active === false) return res.status(403).json({ error: 'This company account has been disabled.' });
+  const token = createSession(user.id);
+  res.json({ token, user: publicUser(user), company: company && publicCompany(company) });
 });
 
 app.post('/api/auth/logout', requireAuth, (req, res) => {
@@ -75,7 +83,7 @@ app.post('/api/auth/logout', requireAuth, (req, res) => {
 });
 
 app.get('/api/me', requireAuth, (req, res) => {
-  res.json({ user: publicUser(req.user), company: req.company });
+  res.json({ user: publicUser(req.user), company: publicCompany(req.company) });
 });
 
 // ---- Company profile ------------------------------------------------------
@@ -90,7 +98,7 @@ app.put('/api/company', requireAuth, (req, res) => {
   }
   req.company.updated_at = now();
   save();
-  res.json({ company: req.company });
+  res.json({ company: publicCompany(req.company) });
 });
 
 // ---- Chats ----------------------------------------------------------------
@@ -102,7 +110,7 @@ function ownChat(req, res) {
 }
 
 app.get('/api/providers', requireAuth, async (req, res) => {
-  res.json({ providers: await providerStatus() });
+  res.json({ providers: await providerStatus(companyAnthropicKey(req.company)) });
 });
 
 app.get('/api/chats', requireAuth, (req, res) => {
@@ -194,7 +202,12 @@ async function writeReply(company, chatId, messageId, provider) {
     .map(({ role, content }) => ({ role, content }));
 
   try {
-    reply.content = await complete({ provider, system: systemPrompt(company), messages: history });
+    reply.content = await complete({
+      provider,
+      system: systemPrompt(company),
+      messages: history,
+      anthropicKey: companyAnthropicKey(company),
+    });
     reply.status = 'done';
   } catch (err) {
     reply.status = 'error';
@@ -210,6 +223,7 @@ app.get('/api/scheduled', requireAuth, (req, res) => {
     tasks: tasksFor(req.company.id),
     briefings: briefingsFor(req.company.id),
     auto_post: req.company.auto_post || { enabled: false, targets: [] },
+    auto_post_allowed: Boolean(req.company.auto_post_allowed),
   });
 });
 
@@ -247,10 +261,20 @@ app.get('/api/search', requireAuth, (req, res) => {
 
 mountPlugins(app, requireAuth);
 mountDrafts(app, requireAuth);
+mountAdmin(app);
 
 // ---- Start ----------------------------------------------------------------
 
 seedFirstUser();
+
+// Accounts created before admins existed: the first user becomes the admin, so someone can manage the platform.
+{
+  const state = db();
+  if (state.users.length && !state.users.some((u) => u.role === 'admin')) {
+    state.users[0].role = 'admin';
+    save();
+  }
+}
 
 // A reply that was still being written when the server stopped can't finish now. Mark it so the browser stops waiting.
 for (const m of db().messages) {

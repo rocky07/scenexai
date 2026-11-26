@@ -9,9 +9,10 @@ const CLAUDE_KEY = process.env.ANTHROPIC_API_KEY;
 // LOCAL_AI_URL may be the full /api/ask address or just the server's base address.
 const ASK_URL = /\/api\/ask\/?$/.test(LOCAL_URL) ? LOCAL_URL : `${LOCAL_URL.replace(/\/$/, '')}/api/ask`;
 
-export async function providerStatus() {
+// anthropicKey: the company's own key. Without one, the platform key from ANTHROPIC_API_KEY is used.
+export async function providerStatus(anthropicKey) {
   const local = { id: 'local', label: 'Local AI', model: LOCAL_MODEL, available: false };
-  const claude = { id: 'claude', label: 'Claude', model: CLAUDE_MODEL, available: Boolean(CLAUDE_KEY) };
+  const claude = { id: 'claude', label: 'Claude', model: CLAUDE_MODEL, available: Boolean(anthropicKey || CLAUDE_KEY) };
 
   try {
     // The endpoint has no health check. Any HTTP reply, even an error, means the server is listening.
@@ -24,8 +25,8 @@ export async function providerStatus() {
 }
 
 // messages: [{ role: 'user' | 'assistant', content }], system: string
-export async function complete({ provider, system, messages }) {
-  if (provider === 'claude') return callClaude(system, messages);
+export async function complete({ provider, system, messages, anthropicKey }) {
+  if (provider === 'claude') return callClaude(system, messages, anthropicKey || CLAUDE_KEY);
   if (provider === 'local') return callLocal(system, messages);
   throw new Error(`Unknown provider: ${provider}`);
 }
@@ -51,13 +52,13 @@ async function callLocal(system, messages) {
   return data.response;
 }
 
-async function callClaude(system, messages) {
-  if (!CLAUDE_KEY) throw new Error('ANTHROPIC_API_KEY is not set on the server.');
+async function callClaude(system, messages, apiKey) {
+  if (!apiKey) throw new Error('No Anthropic API key is set for this company.');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': CLAUDE_KEY,
+      'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
