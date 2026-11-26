@@ -3,6 +3,10 @@ import crypto from 'node:crypto';
 import { db, save } from '../store.js';
 import { encrypt, decrypt } from '../crypto.js';
 
+// App settings (Meta app ID and secret, LinkedIn client ID and secret) belong to Scenex AI, not to each company.
+// They are stored once, under this owner id. Company arguments are kept for the callers' benefit and ignored.
+const PLATFORM = 'platform';
+
 function tables() {
   const state = db();
   state.plugin_configs ||= [];
@@ -11,8 +15,8 @@ function tables() {
 }
 
 // Returns the company's values for a plugin. Secret fields are decrypted here, on the server only.
-export function getConfig(companyId, plugin) {
-  const row = tables().plugin_configs.find((c) => c.company_id === companyId && c.plugin_id === plugin.id);
+export function getConfig(_companyId, plugin) {
+  const row = tables().plugin_configs.find((c) => c.company_id === PLATFORM && c.plugin_id === plugin.id);
   const values = {};
   for (const field of plugin.fields) {
     const raw = row?.values?.[field.key];
@@ -22,8 +26,8 @@ export function getConfig(companyId, plugin) {
 }
 
 // What the settings page may show: plain values, and only "is set" for secrets.
-export function publicConfig(companyId, plugin) {
-  const row = tables().plugin_configs.find((c) => c.company_id === companyId && c.plugin_id === plugin.id);
+export function publicConfig(_companyId, plugin) {
+  const row = tables().plugin_configs.find((c) => c.company_id === PLATFORM && c.plugin_id === plugin.id);
   return plugin.fields.map((field) => ({
     key: field.key,
     label: field.label,
@@ -40,11 +44,11 @@ export function isConfigured(companyId, plugin) {
 }
 
 // Blank secret input means "keep the saved value", so the page never has to resend secrets.
-export function saveConfig(companyId, plugin, incoming) {
+export function saveConfig(_companyId, plugin, incoming) {
   const state = tables();
-  let row = state.plugin_configs.find((c) => c.company_id === companyId && c.plugin_id === plugin.id);
+  let row = state.plugin_configs.find((c) => c.company_id === PLATFORM && c.plugin_id === plugin.id);
   if (!row) {
-    row = { company_id: companyId, plugin_id: plugin.id, values: {} };
+    row = { company_id: PLATFORM, plugin_id: plugin.id, values: {} };
     state.plugin_configs.push(row);
   }
   for (const field of plugin.fields) {
@@ -114,6 +118,6 @@ export function findByExternal(pluginId, externalId) {
   return tables().plugin_connections.find((c) => c.plugin_id === pluginId && c.external_id === externalId) || null;
 }
 
-export function allConfigs(pluginId) {
-  return tables().plugin_configs.filter((c) => c.plugin_id === pluginId);
+export function platformConfigRow(pluginId) {
+  return tables().plugin_configs.find((c) => c.company_id === PLATFORM && c.plugin_id === pluginId) || null;
 }

@@ -2,7 +2,7 @@
 // not personal profile messages.
 import crypto from 'node:crypto';
 import { decrypt } from '../crypto.js';
-import { getConfig, allConfigs, findByExternal } from './shared.js';
+import { getConfig, platformConfigRow, findByExternal } from './shared.js';
 
 const VERSION = process.env.FB_GRAPH_VERSION || 'v23.0';
 const GRAPH = `https://graph.facebook.com/${VERSION}`;
@@ -168,10 +168,8 @@ const facebook = {
     // Meta checks the URL with a challenge. Any company's verify token can match, since one webhook URL serves all.
     verify(query) {
       if (query['hub.mode'] !== 'subscribe') return null;
-      const match = allConfigs(facebook.id).some((row) => {
-        const token = row.values?.verify_token;
-        return token && decrypt(token) === query['hub.verify_token'];
-      });
+      const token = platformConfigRow(facebook.id)?.values?.verify_token;
+      const match = Boolean(token) && decrypt(token) === query['hub.verify_token'];
       return match ? query['hub.challenge'] : null;
     },
 

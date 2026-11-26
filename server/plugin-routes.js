@@ -2,6 +2,7 @@
 import crypto from 'node:crypto';
 import { plugins, pluginById as byId } from './plugins/index.js';
 import { encryptionReady } from './crypto.js';
+import { requireAdmin } from './auth.js';
 import {
   publicConfig,
   isConfigured,
@@ -24,15 +25,17 @@ const pendingLogins = new Map();
 
 const redirectUriFor = (plugin) => `${PUBLIC_API_URL}/api/plugins/${plugin.id}/callback`;
 
-function summary(companyId, plugin) {
+// What a user may see about an integration. App settings and redirect details are for admins only.
+function summary(companyId, plugin, isAdmin) {
   return {
     id: plugin.id,
     name: plugin.name,
     description: plugin.description,
     capabilities: plugin.capabilities,
     configured: isConfigured(companyId, plugin),
-    fields: publicConfig(companyId, plugin),
-    redirect_uri: PUBLIC_API_URL ? redirectUriFor(plugin) : null,
+    can_configure: isAdmin,
+    fields: isAdmin ? publicConfig(companyId, plugin) : [],
+    redirect_uri: isAdmin && PUBLIC_API_URL ? redirectUriFor(plugin) : null,
     connections: connectionsFor(companyId, plugin.id).map(publicConnection),
   };
 }
@@ -55,16 +58,18 @@ export function mountPlugins(app, requireAuth) {
   };
 
   app.get('/api/plugins', requireAuth, (req, res) => {
-    res.json({ plugins: plugins.map((p) => summary(req.company.id, p)) });
+    const isAdmin = req.user.role === 'admin';
+    res.json({ plugins: plugins.map((p) => summary(req.company.id, p, isAdmin)) });
   });
 
-  app.put('/api/plugins/:pluginId/config', requireAuth, (req, res) => {
+  // App settings are the platform's, so only Scenex AI admins can change them.
+  app.put('/api/plugins/:pluginId/config', requireAdmin, (req, res) => {
     const plugin = pluginOr404(req, res);
     if (!plugin) return;
     if (!encryptionReady()) return res.status(503).json({ error: 'ENCRYPTION_KEY is not set on the server.' });
     try {
       saveConfig(req.company.id, plugin, req.body || {});
-      res.json({ plugin: summary(req.company.id, plugin) });
+      res.json({ plugin: summary(req.company.id, plugin, true) });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

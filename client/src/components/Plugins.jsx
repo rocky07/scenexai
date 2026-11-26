@@ -154,7 +154,7 @@ function PluginDetail({ plugin, initialTab, notice, onChange, onBack }) {
           <p className="muted">{plugin.description}</p>
         </div>
         <span className={`status-pill ${plugin.configured ? 'on' : ''}`}>
-          {plugin.configured ? 'Ready' : 'Setup needed'}
+          {plugin.configured ? 'Ready' : plugin.can_configure ? 'Setup needed' : 'Not available yet'}
         </span>
       </header>
 
@@ -229,8 +229,8 @@ function Setup({ plugin, onChange }) {
       {error && <div className="error">{error}</div>}
 
       <form className="integration-form" onSubmit={save}>
-        <h3 className="section-label-lg">App settings</h3>
-        {plugin.fields.map((field) => (
+        {plugin.can_configure && <h3 className="section-label-lg">App settings (Scenex AI admins)</h3>}
+        {plugin.can_configure && plugin.fields.map((field) => (
           <label key={field.key}>
             {field.label}
             <input
@@ -244,7 +244,7 @@ function Setup({ plugin, onChange }) {
           </label>
         ))}
 
-        {plugin.redirect_uri && (
+        {plugin.can_configure && plugin.redirect_uri && (
           <p className="hint">
             Register this redirect URI in the {plugin.name} app settings: <code>{plugin.redirect_uri}</code>
           </p>
@@ -252,13 +252,18 @@ function Setup({ plugin, onChange }) {
 
         <div className="integration-actions">
           {message && <span className="hint">{message}</span>}
-          <button className="btn" disabled={saving}>
-            {saving ? 'Saving…' : 'Save settings'}
-          </button>
+          {plugin.can_configure && (
+            <button className="btn" disabled={saving}>
+              {saving ? 'Saving…' : 'Save settings'}
+            </button>
+          )}
           <button type="button" className="btn primary" onClick={connect} disabled={!plugin.configured || connecting}>
             {connecting ? 'Opening…' : `Connect ${plugin.name}`}
           </button>
         </div>
+        {!plugin.configured && !plugin.can_configure && (
+          <p className="hint">{plugin.name} isn’t available yet. Scenex AI is setting it up for your account.</p>
+        )}
       </form>
 
       <h3 className="section-label-lg">Connected accounts</h3>
