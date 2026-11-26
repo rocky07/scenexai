@@ -1649,3 +1649,15 @@ textarea:focus {
 .save-draft {
   justify-self: start;
 }
+
+.briefing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.briefing-header > div {
+  display: grid;
+  gap: 2px;
+}

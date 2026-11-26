@@ -230,6 +230,15 @@ app.post('/api/scheduled/:id/run', requireAuth, async (req, res) => {
   }
 });
 
+app.delete('/api/briefings/:id', requireAuth, (req, res) => {
+  const state = db();
+  const before = state.briefings.length;
+  state.briefings = state.briefings.filter((b) => !(b.id === req.params.id && b.company_id === req.company.id));
+  if (state.briefings.length === before) return res.status(404).json({ error: 'Briefing not found.' });
+  save();
+  res.json({ ok: true });
+});
+
 app.get('/api/search', requireAuth, (req, res) => {
   res.json(search(req.company.id, String(req.query.q || '')));
 });

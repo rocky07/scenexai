@@ -49,6 +49,18 @@ export default function Scheduled({ briefingId }) {
     }
   }
 
+  async function deleteBriefing(briefing) {
+    if (!window.confirm(`Delete “${briefing.title}” from ${formatDate(briefing.created_at)}?`)) return;
+    setError('');
+    try {
+      await api(`/briefings/${briefing.id}`, { method: 'DELETE' });
+      if (openId === briefing.id) setOpenId(null);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function runNow(task) {
     setRunning(task.id);
     setError('');
@@ -151,11 +163,16 @@ export default function Scheduled({ briefingId }) {
 
         {opened && (
           <article className="briefing-view">
-            <header>
-              <strong>{opened.title}</strong>
-              <span className="muted">
-                {formatDate(opened.created_at)} · {opened.provider === 'claude' ? 'Claude' : 'Local AI'}
-              </span>
+            <header className="briefing-header">
+              <div>
+                <strong>{opened.title}</strong>
+                <span className="muted">
+                  {formatDate(opened.created_at)} · {opened.provider === 'claude' ? 'Claude' : 'Local AI'}
+                </span>
+              </div>
+              <button className="btn small ghost" onClick={() => deleteBriefing(opened)}>
+                Delete
+              </button>
             </header>
 
             {opened.posts?.length > 0 ? (
