@@ -164,6 +164,21 @@ export function mountPlugins(app, requireAuth) {
     }
   });
 
+  // ---- Posts (plugins that declare capabilities.feed) ----
+
+  app.get('/api/plugins/:pluginId/connections/:connectionId/posts', requireAuth, async (req, res) => {
+    const plugin = pluginOr404(req, res);
+    if (!plugin) return;
+    if (!plugin.capabilities.feed) return res.status(404).json({ error: `${plugin.name} has no posts feed.` });
+    const conn = connectionWithToken(req.company.id, plugin.id, req.params.connectionId);
+    if (!conn) return res.status(404).json({ error: 'Account not found.' });
+    try {
+      res.json({ posts: await plugin.feed.posts(conn, 10) });
+    } catch (err) {
+      res.status(err.reconnect ? 401 : 502).json({ error: err.message, needs_reconnect: Boolean(err.reconnect) });
+    }
+  });
+
   // ---- Webhooks (plugins that declare capabilities.webhook) ----
 
   app.get('/api/plugins/:pluginId/webhook', (req, res) => {

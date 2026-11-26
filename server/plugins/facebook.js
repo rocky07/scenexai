@@ -40,7 +40,7 @@ const facebook = {
       help: 'Any random string. Enter the same value in the Meta webhook settings.',
     },
   ],
-  capabilities: { inbox: true, webhook: true },
+  capabilities: { inbox: true, webhook: true, feed: true },
 
   loginUrl({ config, redirectUri, state }) {
     const url = new URL(`https://www.facebook.com/${VERSION}/dialog/oauth`);
@@ -115,6 +115,42 @@ const facebook = {
         body: { recipient: { id: recipientId }, messaging_type: 'RESPONSE', message: { text } },
       });
       return { message_id: sent.message_id };
+    },
+  },
+
+  // Recent Page posts with engagement, and the top comments on each. Needs pages_read_engagement.
+  feed: {
+    async posts(conn, limit = 25) {
+      const { data } = await graph(`${conn.external_id}/posts`, {
+        token: conn.token,
+        params: {
+          fields:
+            'id,message,created_time,permalink_url,shares,reactions.summary(total_count),' +
+            'comments.summary(total_count).limit(5){id,message,from,created_time}',
+          limit,
+        },
+      });
+      return data.map((post) => {
+        const reactions = post.reactions?.summary?.total_count || 0;
+        const comments = post.comments?.summary?.total_count || 0;
+        const shares = post.shares?.count || 0;
+        return {
+          id: post.id,
+          text: post.message || '',
+          created_time: post.created_time,
+          url: post.permalink_url || null,
+          reactions,
+          comments,
+          shares,
+          engagement: reactions + comments + shares,
+          top_comments: (post.comments?.data || []).map((c) => ({
+            id: c.id,
+            text: c.message || '',
+            from: c.from?.name || 'Someone',
+            created_time: c.created_time,
+          })),
+        };
+      });
     },
   },
 

@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import Icon from './Icon.jsx';
 import Inbox from './Inbox.jsx';
 import Publish from './Publish.jsx';
+import Posts from './Posts.jsx';
 
 const NOTICES = {
   connected: 'Account connected.',
@@ -125,12 +126,18 @@ function PluginIcon({ id, name }) {
 function PluginDetail({ plugin, initialTab, notice, onChange, onBack }) {
   const hasInbox = plugin.capabilities.inbox;
   const canPublish = Boolean(plugin.capabilities.publish);
+  const hasPosts = Boolean(plugin.capabilities.feed);
   const [tab, setTab] = useState(
-    (initialTab === 'inbox' && hasInbox) || (initialTab === 'publish' && canPublish) ? initialTab : 'setup',
+    (initialTab === 'inbox' && hasInbox) ||
+      (initialTab === 'publish' && canPublish) ||
+      (initialTab === 'posts' && hasPosts)
+      ? initialTab
+      : 'setup',
   );
   const tabs = [
     ['setup', 'Setup'],
     ...(hasInbox ? [['inbox', 'Inbox']] : []),
+    ...(hasPosts ? [['posts', 'Posts']] : []),
     ...(canPublish ? [['publish', 'Publish']] : []),
   ];
 
@@ -165,6 +172,7 @@ function PluginDetail({ plugin, initialTab, notice, onChange, onBack }) {
 
       {tab === 'setup' && <Setup plugin={plugin} onChange={onChange} />}
       {tab === 'inbox' && hasInbox && <Inbox pluginId={plugin.id} />}
+      {tab === 'posts' && hasPosts && <Posts plugin={plugin} />}
       {tab === 'publish' && canPublish && <Publish plugin={plugin} />}
     </div>
   );

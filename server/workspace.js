@@ -114,6 +114,25 @@ async function gatherContext(company) {
     }
   }
 
+  for (const plugin of plugins.filter((p) => p.capabilities.feed)) {
+    for (const account of connectionsFor(company.id, plugin.id)) {
+      const conn = connectionWithToken(company.id, plugin.id, account.id);
+      try {
+        const posts = (await plugin.feed.posts(conn, 10)).slice(0, 5);
+        lines.push(`${plugin.name} – ${account.name}: top recent posts by engagement`);
+        for (const post of posts) {
+          const top = post.top_comments[0];
+          lines.push(
+            `- "${post.text.slice(0, 200)}" (${post.reactions} reactions, ${post.comments} comments)` +
+              (top ? ` Top comment: "${top.text.slice(0, 120)}"` : ''),
+          );
+        }
+      } catch (err) {
+        lines.push(`${plugin.name} – ${account.name}: posts could not be loaded (${err.message})`);
+      }
+    }
+  }
+
   const recentChats = tables().chats.filter((c) => c.company_id === company.id).slice(0, 8);
   if (recentChats.length) lines.push(`Recent chats: ${recentChats.map((c) => `"${c.title}"`).join(', ')}`);
 

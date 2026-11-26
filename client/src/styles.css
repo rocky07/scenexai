@@ -1508,3 +1508,45 @@ textarea:focus {
   border-radius: 8px;
   padding: 5px 8px;
 }
+
+/* ---- Posts (feed) --------------------------------------------------- */
+
+.posts {
+  display: grid;
+  gap: 14px;
+}
+
+.posts-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.posts-head select {
+  width: auto;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.post-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.post-comments {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.post-comment {
+  font-size: 14px;
+  line-height: 1.5;
+}
