@@ -1,15 +1,25 @@
-// LinkedIn plugin. Connects a LinkedIn member account with "Sign In with LinkedIn" (OpenID Connect),
-// which needs no partner approval. LinkedIn's messaging API is limited to approved partners, so this
-// plugin has no inbox yet.
+// LinkedIn plugin. Connects a LinkedIn member account with "Sign In with LinkedIn" (OpenID Connect) and
+// "Share on LinkedIn" (w_member_social), which lets the app publish posts as that member.
+// LinkedIn's messaging API is limited to approved partners, so there is no inbox.
+const VERSION = process.env.LINKEDIN_API_VERSION || '202506'; // LinkedIn-Version header, YYYYMM
+
+// Thrown when LinkedIn no longer accepts the saved login, so the UI can ask the person to reconnect.
+export class ReconnectError extends Error {
+  constructor(message) {
+    super(message);
+    this.reconnect = true;
+  }
+}
+
 const linkedin = {
   id: 'linkedin',
   name: 'LinkedIn',
-  description: 'Connect a LinkedIn member account. Messaging access is restricted to LinkedIn partners, so there is no inbox yet.',
+  description: 'Connect a LinkedIn member account to publish posts from Scenex AI. Messaging access is restricted to LinkedIn partners, so there is no inbox.',
   fields: [
     { key: 'client_id', label: 'Client ID' },
     { key: 'client_secret', label: 'Client secret', secret: true },
   ],
-  capabilities: { inbox: false, webhook: false },
+  capabilities: { inbox: false, webhook: false, publish: true },
 
   loginUrl({ config, redirectUri, state }) {
     const url = new URL('https://www.linkedin.com/oauth/v2/authorization');
@@ -17,8 +27,43 @@ const linkedin = {
     url.searchParams.set('client_id', config.client_id);
     url.searchParams.set('redirect_uri', redirectUri);
     url.searchParams.set('state', state);
-    url.searchParams.set('scope', 'openid profile email');
+    url.searchParams.set('scope', 'openid profile email w_member_social');
     return url.toString();
+  },
+
+  // Publishes a text post as the connected member. Returns LinkedIn's id for the new post.
+  async publish(conn, text) {
+    if (conn.expires_at && new Date(conn.expires_at) <= new Date()) {
+      throw new ReconnectError('LinkedIn access has expired. Reconnect LinkedIn on the Setup tab.');
+    }
+
+    const res = await fetch('https://api.linkedin.com/rest/posts', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${conn.token}`,
+        'LinkedIn-Version': VERSION,
+        'X-Restli-Protocol-Version': '2.0.0',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        author: `urn:li:person:${conn.external_id}`,
+        commentary: text,
+        visibility: 'PUBLIC',
+        distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },
+        lifecycleState: 'PUBLISHED',
+        isReshareDisabledByAuthor: false,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+
+    if (res.status === 401) {
+      throw new ReconnectError('LinkedIn rejected the saved login. Reconnect LinkedIn on the Setup tab.');
+    }
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`LinkedIn: publish failed (${res.status}) ${detail.slice(0, 200)}`);
+    }
+    return { post_id: res.headers.get('x-restli-id') };
   },
 
   async exchange({ config, redirectUri, code }) {

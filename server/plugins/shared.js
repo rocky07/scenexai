@@ -101,7 +101,12 @@ export function removeConnection(companyId, pluginId, connectionId) {
 export function connectionWithToken(companyId, pluginId, connectionId) {
   const row = connectionsFor(companyId, pluginId).find((c) => c.id === connectionId);
   if (!row) return null;
-  return { ...publicConnection(row), external_id: row.external_id, token: decrypt(row.token_enc) };
+  return {
+    ...publicConnection(row),
+    external_id: row.external_id,
+    expires_at: row.expires_at,
+    token: decrypt(row.token_enc),
+  };
 }
 
 // Used by webhooks: which company owns this external account?

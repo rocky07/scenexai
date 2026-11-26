@@ -4,6 +4,7 @@ import { db, save } from './store.js';
 import { hashPassword, verifyPassword, createSession, deleteSession, requireAuth, publicUser } from './auth.js';
 import { providerStatus, complete } from './ai.js';
 import { mountPlugins } from './plugin-routes.js';
+import { mountDrafts } from './drafts.js';
 import { tasksFor, updateTask, briefingsFor, runTask, search, startScheduler } from './workspace.js';
 
 const PORT = process.env.PORT || 4000;
@@ -232,6 +233,7 @@ app.get('/api/search', requireAuth, (req, res) => {
 // ---- Integrations (plugins) -----------------------------------------------
 
 mountPlugins(app, requireAuth);
+mountDrafts(app, requireAuth);
 
 // ---- Start ----------------------------------------------------------------
 

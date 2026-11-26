@@ -1437,3 +1437,74 @@ textarea:focus {
     height: 70vh;
   }
 }
+
+/* ---- Publish (drafts) ----------------------------------------------- */
+
+.publish {
+  display: grid;
+  gap: 16px;
+}
+
+.publish-form {
+  display: grid;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+
+.publish-form textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.draft-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.draft-card {
+  display: grid;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.draft-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.draft-card .hint {
+  margin: 0;
+}
+
+.draft-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.draft-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.draft-buttons select {
+  width: auto;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 5px 8px;
+}

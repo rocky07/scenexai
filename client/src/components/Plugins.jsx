@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Icon from './Icon.jsx';
 import Inbox from './Inbox.jsx';
+import Publish from './Publish.jsx';
 
 const NOTICES = {
   connected: 'Account connected.',
@@ -122,8 +123,16 @@ function PluginIcon({ id, name }) {
 }
 
 function PluginDetail({ plugin, initialTab, notice, onChange, onBack }) {
-  const [tab, setTab] = useState(initialTab === 'inbox' && plugin.capabilities.inbox ? 'inbox' : 'setup');
   const hasInbox = plugin.capabilities.inbox;
+  const canPublish = Boolean(plugin.capabilities.publish);
+  const [tab, setTab] = useState(
+    (initialTab === 'inbox' && hasInbox) || (initialTab === 'publish' && canPublish) ? initialTab : 'setup',
+  );
+  const tabs = [
+    ['setup', 'Setup'],
+    ...(hasInbox ? [['inbox', 'Inbox']] : []),
+    ...(canPublish ? [['publish', 'Publish']] : []),
+  ];
 
   return (
     <div className="screen">
@@ -144,19 +153,19 @@ function PluginDetail({ plugin, initialTab, notice, onChange, onBack }) {
 
       {notice && <div className="success">{notice}</div>}
 
-      {hasInbox && (
+      {tabs.length > 1 && (
         <div className="segmented" role="tablist">
-          <button className={tab === 'setup' ? 'active' : ''} onClick={() => setTab('setup')}>
-            Setup
-          </button>
-          <button className={tab === 'inbox' ? 'active' : ''} onClick={() => setTab('inbox')}>
-            Inbox
-          </button>
+          {tabs.map(([key, label]) => (
+            <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>
+              {label}
+            </button>
+          ))}
         </div>
       )}
 
       {tab === 'setup' && <Setup plugin={plugin} onChange={onChange} />}
       {tab === 'inbox' && hasInbox && <Inbox pluginId={plugin.id} />}
+      {tab === 'publish' && canPublish && <Publish plugin={plugin} />}
     </div>
   );
 }
