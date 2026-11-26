@@ -139,9 +139,9 @@ app.delete('/api/chats/:id', requireAuth, (req, res) => {
 
 function systemPrompt(company) {
   const lines = [
-    `You are the marketing assistant for ${company.name}.`,
-    'Write captions, hashtags and ad copy that fit this business. Keep posts short and ready to publish.',
-    'Nothing is published without the owner approving it, so offer drafts rather than assuming they are final.',
+    `You are a helpful assistant for ${company.name}.`,
+    'Answer the question or follow the request in the user\'s message. Be direct and natural, and keep answers focused.',
+    'Only write marketing copy (captions, hashtags, ads) when the user asks for it. Nothing is published without the owner approving it.',
   ];
   if (company.products) lines.push(`Products and services:\n${company.products}`);
   if (company.brand_voice) lines.push(`Brand voice:\n${company.brand_voice}`);
