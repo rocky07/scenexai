@@ -11,7 +11,9 @@ import { Ollama } from 'ollama';
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
-const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'qwen2.5:3b';
+const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'qwen3.5:4b';
+// Qwen models can "think" before answering, which is slow. Thinking stays off unless ENABLE_THINKING=true.
+const ENABLE_THINKING = process.env.ENABLE_THINKING === 'true';
 const JOB_TIMEOUT_MS = Number(process.env.JOB_TIMEOUT_MS || 120_000);
 const QUEUE_NAME = 'ollama-inference';
 
@@ -44,6 +46,7 @@ const worker = new Worker(
         { role: 'user', content: prompt },
       ],
       stream: false,
+      think: ENABLE_THINKING,
     });
     return response.message.content;
   },
